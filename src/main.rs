@@ -10,11 +10,16 @@ const PRACTICE_PATH: &str = "data/boards/practice.txt";
 const TOP_N: usize = 5;
 
 fn main() {
-    // TODO (Task 9): replace this unwrap. A load_fleet Err is fatal: print
-    // "Error: could not load <path>: <message>" with eprintln! and call
-    // std::process::exit(1). Then print each skipped line as
-    // "<path> line <n>: <message>" with eprintln! and carry on.
-    let report = data::load_fleet(FLEET_PATH).unwrap();
+    let report = match data::load_fleet(FLEET_PATH) {
+    Ok(report) => report,
+    Err(e) => {
+	eprintln!("Error: could not load {FLEET_PATH}: {e}");
+	std::process::exit(1);
+            }
+    };
+    for (line, e) in &report.skipped {
+        eprintln!("{FLEET_PATH} line {line}: {e}");
+    }
     let fleet = report.fleet;
     if fleet.is_empty() {
         println!("No fleet loaded. Check {FLEET_PATH}.");
@@ -43,13 +48,13 @@ fn main() {
 // Print the best scores, highest first, or a message if there are none.
 fn show_top_scores(n: usize) {
     println!("TOP {n}");
-    // TODO (Task 9): replace this unwrap. If the scores cannot be read, print
-    // "  scores unavailable: <message>" and return. The game keeps running.
-    let mut records = data::load_scores(SCORES_PATH).unwrap();
-    if records.is_empty() {
-        println!("  no scores yet");
-        return;
-    }
+    let mut records = match data::load_scores(SCORES_PATH) {
+     Ok(records) => records,
+        Err(e) => {
+            println!("  scores unavailable: {e}");
+            return;
+        }
+    };
     data::sort_scores_desc(&mut records);
     let shown = if records.len() < n { records.len() } else { n };
     for i in 0..shown {
@@ -79,8 +84,9 @@ fn play_game(fleet: &[ShipSpec]) {
                 let record = ScoreRecord { name, score };
                 // TODO (Task 9): when this fails, say why. Print
                 // "Could not save the score: <message>" and carry on.
-                if data::append_score(SCORES_PATH, &record).is_ok() {
-                    println!("Score saved.");
+                match data::append_score(SCORES_PATH, &record) {
+                    Ok(()) => println!("Score saved."),
+                    Err(e) => println!("Could not save the score: {e}"),
                 }
             }
         }
@@ -96,7 +102,7 @@ fn practice_game() {
             }
         }
         // TODO (Task 9): include the reason: "Practice board unavailable: <message>".
-        Err(_) => println!("Practice board unavailable."),
+        Err(e) => println!("Practice board unavailable: {e}"),
     }
 }
 
