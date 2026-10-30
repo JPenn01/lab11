@@ -37,7 +37,20 @@ pub enum ShipLineError {
 // Use MIN_SHIP and MAX_SHIP in the message instead of typing 2 and 5.
 impl fmt::Display for ShipLineError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TODO: {self:?}")
+        match self {
+	  ShipLineError::MissingComma => {
+	    write!(f, "needs exactly one comma, like Carrier,{MAX_SHIP}")
+            }
+          ShipLineError::EmptyName => {
+                write!(f, "has no ship name before the comma")
+            }
+          ShipLineError::BadLength(text) => {
+                write!(f, "has length '{text}', which is not a whole number")
+            }
+          ShipLineError::LengthOutOfRange(length) => {
+                write!(f, "has length {length}, outside {MIN_SHIP}-{MAX_SHIP}")
+            }
+        }
     }
 }
 
@@ -139,14 +152,15 @@ pub fn parse_ship_line(line: &str) -> Result<ShipSpec, ShipLineError> {
     }
     let name = parts[0].trim();
     if name.is_empty() {
-        return Err(ShipLineError::MissingComma);
+        return Err(ShipLineError::EmptyName);
     }
-    let length = match parts[1].trim().parse::<usize>() {
+    let length_text = parts[1].trim();
+    let length = match length_text.parse::<usize>() {
         Ok(n) => n,
-        Err(_) => return Err(ShipLineError::MissingComma),
+        Err(_) => return Err(ShipLineError::BadLength(length_text.to_string())),
     };
     if length < MIN_SHIP || length > MAX_SHIP {
-        return Err(ShipLineError::MissingComma);
+        return Err(ShipLineError::LengthOutOfRange(length));
     }
     Ok(ShipSpec {
         name: name.to_string(),
@@ -161,35 +175,24 @@ pub fn parse_ship_line(line: &str) -> Result<ShipSpec, ShipLineError> {
 //   - a file with zero valid ships is Err(DataError::NoShips(path.to_string())).
 // Blank lines and '#' lines are skipped silently but still count for line numbers.
 pub fn load_fleet(path: &str) -> Result<FleetReport, DataError> {
-    let text = match fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(e) => {
-            eprintln!("Could not read {path}: {e}");
-            return Ok(FleetReport {
-                fleet: Vec::new(),
-                skipped: Vec::new(),
-            });
-        }
-    };
+    let text = fs::read_to_string(path)?;
     let mut fleet = Vec::new();
-    let mut skipped_count = 0;
-    for line in text.lines() {
-        let line = line.trim();
+    let mut skipped = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+	let line_number = index + 1;
+	let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         match parse_ship_line(line) {
             Ok(ship) => fleet.push(ship),
-            Err(_) => skipped_count += 1,
+            Err(e) => skipped.push((line_number, e)),
         }
     }
-    if skipped_count > 0 {
-        eprintln!("Skipped {skipped_count} invalid line(s) in {path}");
+    if fleet.is_empty() {
+        return Err(DataError::NoShips(path.to_string()));
     }
-    Ok(FleetReport {
-        fleet,
-        skipped: Vec::new(),
-    })
+    Ok(FleetReport { fleet, skipped })
 }
 
 // Turn the text of a board file into a Board.
