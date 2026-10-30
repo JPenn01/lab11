@@ -43,7 +43,17 @@ pub enum CoordError {
 // Study DataError in data.rs: it is a finished example of this impl.
 impl fmt::Display for CoordError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TODO: {self:?}")
+        match self {
+            CoordError::BadFormat => {
+                write!(f, "type a column letter and a row number, like B7")
+            }
+            CoordError::ColumnOutOfRange(letter) => {
+                write!(f, "column {letter} is off the board (A-J)")
+            }
+            CoordError::RowOutOfRange(number) => {
+                write!(f, "row {number} is off the board (1-10)")
+            }
+        }
     }
 }
 
@@ -192,8 +202,11 @@ pub fn parse_coord(text: &str) -> Result<(usize, usize), CoordError> {
         Err(_) => return Err(CoordError::BadFormat),
     };
     let col = (first.to_ascii_uppercase() as usize) - ('A' as usize);
-    if col >= SIZE || row_number < 1 || row_number > SIZE {
-        return Err(CoordError::BadFormat);
+    if col >= SIZE {
+	return Err(CoordError::ColumnOutOfRange(first.to_ascii_uppercase()))
+    }
+    if row_number < 1 || row_number > SIZE {
+        return Err(CoordError::RowOutOfRange(row_number));
     }
     Ok((row_number - 1, col))
 }
